@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Processing Program</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #2e0357; /* Dark purple */
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            background-color: #50157e; /* Light purple */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .upload-section {
+            background-color: #40116b; /* Slightly darker purple */
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .upload-section input {
+            margin: 10px 0;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .result {
+            background-color: #50157e; /* Light purple */
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .result img {
+            width: 100%;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 10px;
+            text-align: center;
+            background-color: #40116b;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Image Processing Program</h1>
+    </header>
+
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h2>Upload an Image</h2>
+            <input type="file" id="image-upload" accept="image/*">
+            <button id="process-btn">Process</button>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results">
+            <div class="result">
+                <h3>Classification</h3>
+                <p id="classification-label">Label: None</p>
+                <img id="classification-output" src="" alt="Classification Output" style="display: none;">
+            </div>
+
+            <div class="result">
+                <h3>Object Detection</h3>
+                <img id="detection-output" src="" alt="Detection Output" style="display: none;">
+            </div>
+
+            <div class="result">
+                <h3>Segmentation</h3>
+                <img id="segmentation-output" src="" alt="Segmentation Output" style="display: none;">
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Image Processing Program</p>
+    </footer>
+
+    <script>
+        document.getElementById('process-btn').addEventListener('click', () => {
+            const imageUpload = document.getElementById('image-upload');
+            if (imageUpload.files.length === 0) {
+                alert('Please upload an image first!');
+                return;
+            }
+
+            const imageFile = imageUpload.files[0];
+
+            // Placeholder for actual image processing logic
+            alert(`Processing image: ${imageFile.name}`);
+
+            // Simulate results (replace with actual results in production)
+            document.getElementById('classification-label').textContent = 'Label: Example Label';
+
+            // Display example images (replace with actual results)
+            const exampleImage = 'https://via.placeholder.com/300'; // Placeholder image
+            document.getElementById('classification-output').src = exampleImage;
+            document.getElementById('classification-output').style.display = 'block';
+            document.getElementById('detection-output').src = exampleImage;
+            document.getElementById('detection-output').style.display = 'block';
+            document.getElementById('segmentation-output').src = exampleImage;
+            document.getElementById('segmentation-output').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
