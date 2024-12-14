@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Processing Program</title>
+    <title>Cataract Eye Disease</title>
     <style>
+        /* Body Styling */
         body {
             margin: 0;
             font-family: Arial, sans-serif;
-            background-color: #2e0357; /* Dark purple */
+            background: linear-gradient(to bottom, #3c1053, #ad5389); /* Dark purple to light purple */
             color: white;
             display: flex;
             flex-direction: column;
@@ -17,151 +18,116 @@
             min-height: 100vh;
         }
 
-        header {
-            width: 100%;
-            padding: 20px;
-            text-align: center;
-            background-color: #50157e; /* Light purple */
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: 2rem;
-        }
-
-        .container {
-            width: 90%;
-            max-width: 1200px;
+        /* Page Title */
+        h1 {
             margin-top: 20px;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 20px;
+            font-size: 2.5rem;
+            color: #f8e1f4; /* Light purple */
+            text-shadow: 2px 2px 5px black;
         }
 
-        .upload-section {
-            background-color: #40116b; /* Slightly darker purple */
+        /* Form Styling */
+        form {
+            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
             padding: 20px;
             border-radius: 10px;
-            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 500px;
+            width: 90%;
         }
 
-        .upload-section input {
-            margin: 10px 0;
+        label {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #f4c2d7; /* Soft pink-purple */
         }
 
-        .results {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+        input[type="file"] {
+            margin-bottom: 15px;
+            padding: 5px;
+            border-radius: 5px;
+            background-color: #5b2c6f; /* Deep purple */
+            color: white;
+            border: none;
         }
 
-        .result {
-            background-color: #50157e; /* Light purple */
-            padding: 15px;
-            border-radius: 10px;
+        button {
+            background-color: #7d3c98; /* Medium purple */
+            color: white;
+            font-size: 1rem;
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        .result img {
-            width: 100%;
-            border-radius: 10px;
-            margin-top: 10px;
+        button:hover {
+            background-color: #a569bd; /* Light purple */
+            transform: scale(1.05);
         }
 
-        footer {
-            margin-top: auto;
+        /* Response Section */
+        h2 {
+            margin-top: 20px;
+            font-size: 1.8rem;
+            color: #f4c2d7; /* Soft pink-purple */
+        }
+
+        pre {
+            background-color: rgba(0, 0, 0, 0.6); /* Dark transparent background */
+            color: #f8e1f4; /* Light purple */
             padding: 10px;
-            text-align: center;
-            background-color: #40116b;
-        }
-
-        @media (max-width: 768px) {
-            header h1 {
-                font-size: 1.5rem;
-            }
+            border-radius: 5px;
+            max-width: 500px;
+            width: 90%;
+            overflow-x: auto;
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Image Processing Program</h1>
-    </header>
-
-    <div class="container">
-        <!-- Upload Section -->
-        <div class="upload-section">
-            <h2>Upload an Image</h2>
-            <input type="file" id="image-upload" accept="image/*">
-            <button id="process-btn">Process</button>
-        </div>
-
-        <!-- Results Section -->
-        <div class="results">
-            <!-- Classification Section -->
-            <div class="result">
-                <h3>Classification</h3>
-                <p id="classification-label">Final Result: None</p>
-            </div>
-
-            <!-- Object Detection Section -->
-            <div class="result">
-                <h3>Object Detection</h3>
-                <img id="detection-output" src="" alt="Detection Output" style="display: none;">
-            </div>
-
-            <!-- Segmentation Section -->
-            <div class="result">
-                <h3>Segmentation</h3>
-                <img id="segmentation-output" src="" alt="Segmentation Output" style="display: none;">
-            </div>
-        </div>
-    </div>
-
-    <footer>
-        <p>&copy; 2024 Image Processing Program</p>
-    </footer>
+    <h1>Cataract Eye Disease</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+        <label for="file">Upload an image:</label>
+        <input type="file" id="file" name="file" accept="image/*" required>
+        <button type="button" onclick="uploadImage('/classify')">Classify</button>
+        <button type="button" onclick="uploadImage('/segment')">Segment</button>
+        <button type="button" onclick="uploadImage('/detect')">Detect</button>
+    </form>
+    <h2>Response:</h2>
+    <pre id="response"></pre>
 
     <script>
-        document.getElementById('process-btn').addEventListener('click', () => {
-            const imageUpload = document.getElementById('image-upload');
-            if (imageUpload.files.length === 0) {
-                alert('Please upload an image first!');
+        // Update this URL to your Render backend URL
+        const backendURL = "https://ai2project.onrender.com";
+
+        function uploadImage(endpoint) {
+            const formData = new FormData();
+            const fileInput = document.getElementById("file");
+            if (fileInput.files.length === 0) {
+                alert("Please select an image!");
                 return;
             }
+            formData.append("file", fileInput.files[0]);
 
-            const imageFile = imageUpload.files[0];
-            const formData = new FormData();
-            formData.append('file', imageFile);
-
-            fetch('http://127.0.0.1:5000/classify', { // Replace with your backend URL if deployed
-                method: 'POST',
+            // Make a POST request to the backend
+            fetch(backendURL + endpoint, {
+                method: "POST",
                 body: formData,
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-
-                // Display classification results dynamically
-                const classificationLabel = document.getElementById('classification-label');
-                classificationLabel.textContent = `Final Result: ${data.Final_Result === 1 ? 'Class 1' : 'Class 0'}`;
-
-                // Placeholder for Object Detection and Segmentation
-                // These will remain empty until the backend supports them
-                const detectionOutput = document.getElementById('detection-output');
-                detectionOutput.src = ''; // Set empty or placeholder image
-                detectionOutput.style.display = 'none';
-
-                const segmentationOutput = document.getElementById('segmentation-output');
-                segmentationOutput.src = ''; // Set empty or placeholder image
-                segmentationOutput.style.display = 'none';
-            })
-            .catch(error => {
-                alert('Error processing image: ' + error.message);
-            });
-        });
+                .then((response) => response.json()) // Parse JSON response
+                .then((data) => {
+                    document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+                })
+                .catch((error) => {
+                    console.error("Error:", error);
+                    document.getElementById("response").textContent = "An error occurred!";
+                });
+        }
     </script>
 </body>
 </html>
