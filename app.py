@@ -1,80 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Image Processing</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #2e0357;
-            color: white;
-            text-align: center;
-        }
-        h1 {
-            margin-bottom: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background-color: #50157e;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        img {
-            max-width: 100%;
-            margin-top: 20px;
-            border-radius: 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>AI Image Processing</h1>
-    <div class="container">
-        <h2>Upload an Image</h2>
-        <input type="file" id="image-upload" accept="image/*">
-        <button onclick="processImage()">Process Image</button>
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
+from tensorflow.keras.models import load_model
+import numpy as np
+from PIL import Image
+import os
 
-        <h3>Classification Result</h3>
-        <p id="classification-result">None</p>
+app = Flask(__name__)
+CORS(app)
 
-        <h3>Segmentation Result</h3>
-        <img id="segmentation-result" src="" alt="Segmentation Output" style="display: none;">
+# Load the models
+classification_model = load_model("models/CNN_No_Dropout.h5")
+segmentation_model = load_model("models/Segmentation_Model.h5")
+detection_model = load_model("models/Detection_Model.h5")
 
-        <h3>Detection Result</h3>
-        <img id="detection-result" src="" alt="Detection Output" style="display: none;">
-    </div>
+# Helper function to preprocess the image for classification
+def preprocess_image(image_path, target_size=(128, 128)):
+    image = Image.open(image_path).convert("RGB").resize(target_size)
+    image_array = np.array(image) / 255.0
+    return np.expand_dims(image_array, axis=0)
 
-    <script>
-        function processImage() {
-            const imageUpload = document.getElementById('image-upload');
-            if (!imageUpload.files[0]) {
-                alert('Please upload an image!');
-                return;
-            }
+# Helper function to preprocess the image for segmentation and detection
+def preprocess_for_segmentation(image_path, target_size=(256, 256)):
+    image = Image.open(image_path).convert("RGB").resize(target_size)
+    image_array = np.array(image) / 255.0
+    return np.expand_dims(image_array, axis=0)
 
-            const formData = new FormData();
-            formData.append('file', imageUpload.files[0]);
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-            fetch('/process', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('classification-result').textContent = 
-                    data.classification === 1 ? 'Class 1' : 'Class 0';
+@app.route('/process', methods=['POST'])
+def process_image():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
 
-                document.getElementById('segmentation-result').src = data.segmentation;
-                document.getElementById('segmentation-result').style.display = 'block';
+    file = request.files['file']
+    file_path = "uploaded_image.jpg"
+    file.save(file_path)
 
-                document.getElementById('detection-result').src = data.detection;
-                document.getElementById('detection-result').style.display = 'block';
-            })
-            .catch(err => alert('Error: ' + err.message));
-        }
-    </script>
-</body>
-</html>
+    # Process the image for classification
+    image_for_classification = preprocess_image(file_path)
+    classification_result = (classification_model.predict(image_for_classification) > 0.5).astype("int32")[0][0]
+
+    # Process the image for segmentation
+    image_for_segmentation = preprocess_for_segmentation(file_path)
+    segmentation_result = segmentation_model.predict(image_for_segmentation)[0]
+
+    # Save segmentation result as an image
+    segmentation_output_path = "static/segmentation_output.jpg"
+    segmentation_image = (segmentation_result * 255).astype(np.uint8)
+    segmentation_image = Image.fromarray(segmentation_image)
+    segmentation_image.save(segmentation_output_path)
+
+    # Process the image for object detection
+    detection_output_path = "static/detection_output.jpg"
+    detection_image = Image.open(file_path)
+    detection_image.save(detection_output_path)
+
+    os.remove(file_path)
+    return jsonify({
+        'classification': int(classification_result),
+        'segmentation': segmentation_output_path,
+        'detection': detection_output_path
+    })
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
