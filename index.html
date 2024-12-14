@@ -78,14 +78,22 @@
             color: #f4c2d7; /* Soft pink-purple */
         }
 
+        pre, img {
+            margin-top: 15px;
+            max-width: 500px;
+            width: 90%;
+            border-radius: 5px;
+        }
+
         pre {
             background-color: rgba(0, 0, 0, 0.6); /* Dark transparent background */
             color: #f8e1f4; /* Light purple */
             padding: 10px;
-            border-radius: 5px;
-            max-width: 500px;
-            width: 90%;
             overflow-x: auto;
+        }
+
+        img {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
         }
     </style>
 </head>
@@ -99,12 +107,13 @@
         <button type="button" onclick="uploadImage('/detect')">Detect</button>
     </form>
     <h2>Response:</h2>
-    <pre id="response"></pre>
+    <div id="response"></div>
 
     <script>
-        // Update this URL to your Render backend URL
+        // Backend URL (update this with your Render backend URL)
         const backendURL = "https://ai2project.onrender.com";
 
+        // Function to handle image uploads and process results
         function uploadImage(endpoint) {
             const formData = new FormData();
             const fileInput = document.getElementById("file");
@@ -114,18 +123,41 @@
             }
             formData.append("file", fileInput.files[0]);
 
-            // Make a POST request to the backend
+            // Clear previous response
+            const responseDiv = document.getElementById("response");
+            responseDiv.innerHTML = "";
+
+            // Make the POST request to the backend
             fetch(backendURL + endpoint, {
                 method: "POST",
                 body: formData,
             })
-                .then((response) => response.json()) // Parse JSON response
+                .then((response) => {
+                    // Check if the response is an image or JSON
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.includes("image")) {
+                        return response.blob(); // Image
+                    } else {
+                        return response.json(); // JSON
+                    }
+                })
                 .then((data) => {
-                    document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+                    // Handle JSON response
+                    if (data instanceof Blob) {
+                        // Display the image
+                        const img = document.createElement("img");
+                        img.src = URL.createObjectURL(data);
+                        responseDiv.appendChild(img);
+                    } else {
+                        // Display the JSON response
+                        const pre = document.createElement("pre");
+                        pre.textContent = JSON.stringify(data, null, 2);
+                        responseDiv.appendChild(pre);
+                    }
                 })
                 .catch((error) => {
                     console.error("Error:", error);
-                    document.getElementById("response").textContent = "An error occurred!";
+                    responseDiv.textContent = "An error occurred!";
                 });
         }
     </script>
