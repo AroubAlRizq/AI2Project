@@ -13,12 +13,12 @@ def download_models():
     # Download Segmentation model (.pt for PyTorch)
     if not os.path.exists("models/best.pt"):
         print("Downloading Segmentation_Model.pt...")
-        gdown.download("https://drive.google.com/uc?id=YOUR_SEGMENTATION_MODEL_ID", "models/Segmentation_Model.pt", quiet=False)
+        gdown.download("https://drive.google.com/uc?id=18p5Re6-d1mdc17LskkUKru-ZtnNVundM", "models/best.pt", quiet=False)
 
     # Download Detection model (.torchscript for PyTorch)
     if not os.path.exists("models/best.torchscript"):
         print("Downloading Detection_Model.torchscript...")
-        gdown.download("https://drive.google.com/uc?id=YOUR_DETECTION_MODEL_ID", "models/Detection_Model.torchscript", quiet=False)
+        gdown.download("https://drive.google.com/uc?id=1yy1hLydU6-s45b38GdaceqCVI34GH22W", "models/best.torchscript", quiet=False)
 
 if __name__ == "__main__":
     download_models()
