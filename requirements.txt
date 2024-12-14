@@ -3,3 +3,4 @@ Flask-Cors
 tensorflow
 numpy
 Pillow
+gdown
