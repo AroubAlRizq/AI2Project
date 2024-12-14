@@ -99,18 +99,7 @@
         <div class="results">
             <div class="result">
                 <h3>Classification</h3>
-                <p id="classification-label">Label: None</p>
-                <img id="classification-output" src="" alt="Classification Output" style="display: none;">
-            </div>
-
-            <div class="result">
-                <h3>Object Detection</h3>
-                <img id="detection-output" src="" alt="Detection Output" style="display: none;">
-            </div>
-
-            <div class="result">
-                <h3>Segmentation</h3>
-                <img id="segmentation-output" src="" alt="Segmentation Output" style="display: none;">
+                <p id="classification-label">Final Result: None</p>
             </div>
         </div>
     </div>
@@ -128,21 +117,27 @@
             }
 
             const imageFile = imageUpload.files[0];
+            const formData = new FormData();
+            formData.append('file', imageFile);
 
-            // Placeholder for actual image processing logic
-            alert(`Processing image: ${imageFile.name}`);
+            fetch('http://127.0.0.1:5000/classify', { // Replace with your backend URL if deployed
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
 
-            // Simulate results (replace with actual results in production)
-            document.getElementById('classification-label').textContent = 'Label: Example Label';
-
-            // Display example images (replace with actual results)
-            const exampleImage = 'https://via.placeholder.com/300'; // Placeholder image
-            document.getElementById('classification-output').src = exampleImage;
-            document.getElementById('classification-output').style.display = 'block';
-            document.getElementById('detection-output').src = exampleImage;
-            document.getElementById('detection-output').style.display = 'block';
-            document.getElementById('segmentation-output').src = exampleImage;
-            document.getElementById('segmentation-output').style.display = 'block';
+                // Display results dynamically
+                const resultLabel = document.getElementById('classification-label');
+                resultLabel.textContent = `Final Result: ${data.Final_Result === 1 ? 'Class 1' : 'Class 0'}`;
+            })
+            .catch(error => {
+                alert('Error processing image: ' + error.message);
+            });
         });
     </script>
 </body>
