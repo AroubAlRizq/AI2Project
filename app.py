@@ -1,73 +1,110 @@
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
-from tensorflow.keras.models import load_model
-import numpy as np
-from PIL import Image
 import os
+import torch  # For loading PyTorch models
+from tensorflow.keras.models import load_model  # For loading .h5 models
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
 from file_download import download_models
-from tensorflow.keras.models import load_model
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from PIL import Image
+import numpy as np
 
+# Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Load the models
-classification_model = load_model("models/CNN_No_Dropout.h5")
-segmentation_model = load_model("models/Segmentation_Model.h5")
-detection_model = load_model("models/Detection_Model.h5")
+# Download models before loading
+download_models()
 
-# Helper function to preprocess the image for classification
-def preprocess_image(image_path, target_size=(128, 128)):
-    image = Image.open(image_path).convert("RGB").resize(target_size)
-    image_array = np.array(image) / 255.0
-    return np.expand_dims(image_array, axis=0)
+# Load TensorFlow CNN model (.h5)
+classification_model = load_model("models/CNN_Model.h5")
 
-# Helper function to preprocess the image for segmentation and detection
-def preprocess_for_segmentation(image_path, target_size=(256, 256)):
-    image = Image.open(image_path).convert("RGB").resize(target_size)
-    image_array = np.array(image) / 255.0
-    return np.expand_dims(image_array, axis=0)
+# Load PyTorch Segmentation model (.pt)
+segmentation_model = torch.load("models/best.pt", map_location=torch.device("cpu"))
+segmentation_model.eval()  # Set the model to evaluation mode
 
-@app.route('/')
+# Load PyTorch Detection model (.torchscript)
+detection_model = torch.jit.load("models/best.torchscript", map_location=torch.device("cpu"))
+detection_model.eval()  # Set the model to evaluation mode
+
+# Helper: Preprocess for CNN classification
+def preprocess_image(image_path):
+    image = load_img(image_path, target_size=(128, 128))  # Resize to model input size
+    image = img_to_array(image) / 255.0  # Normalize
+    image = image.reshape(1, 128, 128, 3)  # Add batch dimension
+    return image
+
+# Helper: Preprocess for Segmentation and Detection (PyTorch)
+def preprocess_pytorch_image(image_path, size):
+    image = Image.open(image_path).convert("RGB")
+    image = image.resize(size)  # Resize to model input size
+    image_array = np.array(image).transpose(2, 0, 1) / 255.0  # Normalize and transpose to (C, H, W)
+    image_tensor = torch.tensor(image_array).unsqueeze(0).float()  # Add batch dimension
+    return image_tensor
+
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return "Backend is running!"
 
-@app.route('/process', methods=['POST'])
-def process_image():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
+@app.route("/classify", methods=["POST"])
+def classify():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files['file']
+    file = request.files["file"]
     file_path = "uploaded_image.jpg"
     file.save(file_path)
 
-    # Process the image for classification
-    image_for_classification = preprocess_image(file_path)
-    classification_result = (classification_model.predict(image_for_classification) > 0.5).astype("int32")[0][0]
+    # Preprocess and classify
+    image = preprocess_image(file_path)
+    prediction = classification_model.predict(image)
+    os.remove(file_path)  # Clean up the uploaded file
 
-    # Process the image for segmentation
-    image_for_segmentation = preprocess_for_segmentation(file_path)
-    segmentation_result = segmentation_model.predict(image_for_segmentation)[0]
+    # Return the classification result
+    result = "Class 1" if prediction[0][0] > 0.5 else "Class 0"
+    return jsonify({"classification_result": result})
 
-    # Save segmentation result as an image
+@app.route("/segment", methods=["POST"])
+def segment():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    file_path = "uploaded_image.jpg"
+    file.save(file_path)
+
+    # Preprocess and segment
+    image_tensor = preprocess_pytorch_image(file_path, size=(256, 256))
+    with torch.no_grad():
+        segmentation_output = segmentation_model(image_tensor)  # Forward pass
+
+    os.remove(file_path)  # Clean up the uploaded file
+
+    # Save the segmentation mask as an image
     segmentation_output_path = "static/segmentation_output.jpg"
-    segmentation_image = (segmentation_result * 255).astype(np.uint8)
-    segmentation_image = Image.fromarray(segmentation_image)
-    segmentation_image.save(segmentation_output_path)
+    segmentation_mask = (segmentation_output[0].numpy() * 255).astype(np.uint8)  # Convert to image format
+    segmentation_mask = np.transpose(segmentation_mask, (1, 2, 0))  # Convert to H, W, C
+    Image.fromarray(segmentation_mask).save(segmentation_output_path)
 
-    # Process the image for object detection
-    detection_output_path = "static/detection_output.jpg"
-    detection_image = Image.open(file_path)
-    detection_image.save(detection_output_path)
+    return jsonify({"segmentation_result": segmentation_output_path})
 
-    os.remove(file_path)
-    return jsonify({
-        'classification': int(classification_result),
-        'segmentation': segmentation_output_path,
-        'detection': detection_output_path
-    })
+@app.route("/detect", methods=["POST"])
+def detect():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    file = request.files["file"]
+    file_path = "uploaded_image.jpg"
+    file.save(file_path)
+
+    # Preprocess and detect
+    image_tensor = preprocess_pytorch_image(file_path, size=(640, 640))
+    with torch.no_grad():
+        detection_output = detection_model(image_tensor)  # Forward pass
+
+    os.remove(file_path)  # Clean up the uploaded file
+
+    # Return raw detection results (you can process this further for bounding boxes, etc.)
+    return jsonify({"detection_result": detection_output.tolist()})
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
