@@ -97,9 +97,22 @@
 
         <!-- Results Section -->
         <div class="results">
+            <!-- Classification Section -->
             <div class="result">
                 <h3>Classification</h3>
                 <p id="classification-label">Final Result: None</p>
+            </div>
+
+            <!-- Object Detection Section -->
+            <div class="result">
+                <h3>Object Detection</h3>
+                <img id="detection-output" src="" alt="Detection Output" style="display: none;">
+            </div>
+
+            <!-- Segmentation Section -->
+            <div class="result">
+                <h3>Segmentation</h3>
+                <img id="segmentation-output" src="" alt="Segmentation Output" style="display: none;">
             </div>
         </div>
     </div>
@@ -131,9 +144,19 @@
                     return;
                 }
 
-                // Display results dynamically
-                const resultLabel = document.getElementById('classification-label');
-                resultLabel.textContent = `Final Result: ${data.Final_Result === 1 ? 'Class 1' : 'Class 0'}`;
+                // Display classification results dynamically
+                const classificationLabel = document.getElementById('classification-label');
+                classificationLabel.textContent = `Final Result: ${data.Final_Result === 1 ? 'Class 1' : 'Class 0'}`;
+
+                // Placeholder for Object Detection and Segmentation
+                // These will remain empty until the backend supports them
+                const detectionOutput = document.getElementById('detection-output');
+                detectionOutput.src = ''; // Set empty or placeholder image
+                detectionOutput.style.display = 'none';
+
+                const segmentationOutput = document.getElementById('segmentation-output');
+                segmentationOutput.src = ''; // Set empty or placeholder image
+                segmentationOutput.style.display = 'none';
             })
             .catch(error => {
                 alert('Error processing image: ' + error.message);
@@ -142,3 +165,4 @@
     </script>
 </body>
 </html>
+
