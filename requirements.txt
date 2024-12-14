@@ -3,6 +3,7 @@ Flask-Cors
 tensorflow
 torch
 torchvision
+ultralytics
 gdown
 Pillow
 numpy
