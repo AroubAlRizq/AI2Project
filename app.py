@@ -79,10 +79,11 @@ except Exception as e:
 # Helper function to preprocess images for classification
 def preprocess_image_for_classification(image_path):
     image = Image.open(image_path).convert("RGB")
-    image = image.resize((240, 240))  # Resize to match the model's expected input
-    image = np.array(image) / 255.0  # Normalize
+    image = image.resize((120, 120))  # Resize to match the model's expected input
+    image = np.array(image).reshape(-1) / 255.0  # Flatten the image
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
+
 
 @app.route("/")
 def home():
@@ -136,13 +137,14 @@ def segment():
 
         # Perform segmentation
         image = Image.open(file_path).convert("RGB")
-        print(f"Segmentation Input Image Size: {image.size}, Mode: {image.mode}")  # Log image details
         image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0).float() / 255.0
-        print(f"Segmentation Tensor Shape: {image_tensor.shape}")  # Log tensor shape
-        result = segmentation_model(image_tensor)  # Run the model
+        result = segmentation_model(image_tensor)
 
-        # Assuming the segmentation output is a dict, access the correct key
-        mask = result.get("masks", torch.zeros(image.size)).detach().cpu().numpy()
+        # Assuming the segmentation output contains a "masks" key
+        if "masks" not in result:
+            raise ValueError("Segmentation model did not return masks.")
+
+        mask = result["masks"][0].detach().cpu().numpy()
         mask = (mask > 0.5).astype(np.uint8) * 255
         mask_image = Image.fromarray(mask).convert("L").resize(image.size)
         segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
@@ -153,10 +155,9 @@ def segment():
         os.remove(file_path)
         return send_file(segmented_image_path, mimetype="image/jpeg")
     except Exception as e:
-        # Log the detailed traceback for debugging
         error_message = traceback.format_exc()
         print(f"Error in /segment endpoint: {error_message}")
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 # Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
@@ -171,13 +172,11 @@ def detect():
 
         # Perform detection
         image = cv2.imread(file_path)
-        print(f"Detection Input Image Shape: {image.shape}")  # Log image shape
+        image = cv2.resize(image, (640, 640))  # Resize to the model's expected input size
         image_tensor = torch.tensor(image).permute(2, 0, 1).unsqueeze(0).to(torch.float32) / 255.0
-        print(f"Detection Tensor Shape: {image_tensor.shape}")  # Log tensor shape
         result = detection_model(image_tensor)
 
         # Annotate image with bounding boxes
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         detection_output = result.tolist()
         for detection in detection_output[0]:
             confidence = detection[0]
@@ -191,9 +190,9 @@ def detect():
         os.remove(file_path)
         return send_file(detected_image_path, mimetype="image/jpeg")
     except Exception as e:
-        # Log the detailed traceback for debugging
         error_message = traceback.format_exc()
         print(f"Error in /detect endpoint: {error_message}")
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
