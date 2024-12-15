@@ -7,6 +7,8 @@ from PIL import Image
 import numpy as np
 import gdown
 import cv2
+import traceback
+
 
 app = Flask(__name__)
 CORS(app)
@@ -86,7 +88,14 @@ def preprocess_image_for_classification(image_path):
 def home():
     return "Backend is running!"
 
-# Classification Endpoint
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Log the full traceback for debugging
+    error_message = traceback.format_exc()
+    print(f"Internal Server Error: {error_message}")
+    return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
+# Update classify endpoint with better error logging
 @app.route("/classify", methods=["POST"])
 def classify():
     try:
@@ -109,10 +118,12 @@ def classify():
 
         return jsonify({"classification_result": class_name})
     except Exception as e:
-        print(f"Error in /classify endpoint: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Log the detailed traceback for debugging
+        error_message = traceback.format_exc()
+        print(f"Error in /classify endpoint: {error_message}")
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
-# Segmentation Endpoint
+# Update segment endpoint with better error logging
 @app.route("/segment", methods=["POST"])
 def segment():
     try:
@@ -125,16 +136,15 @@ def segment():
 
         # Perform segmentation
         image = Image.open(file_path).convert("RGB")
+        print(f"Segmentation Input Image Size: {image.size}, Mode: {image.mode}")  # Log image details
         image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0).float() / 255.0
+        print(f"Segmentation Tensor Shape: {image_tensor.shape}")  # Log tensor shape
         result = segmentation_model(image_tensor)  # Run the model
 
         # Assuming the segmentation output is a dict, access the correct key
-        if isinstance(result, dict) and "masks" in result:
-            mask = result["masks"][0].cpu().numpy()
-        else:
-            mask = torch.zeros((image.size[1], image.size[0])).numpy()
-
-        mask_image = Image.fromarray((mask * 255).astype(np.uint8)).resize(image.size)
+        mask = result.get("masks", torch.zeros(image.size)).detach().cpu().numpy()
+        mask = (mask > 0.5).astype(np.uint8) * 255
+        mask_image = Image.fromarray(mask).convert("L").resize(image.size)
         segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
 
         # Save and return the segmented image
@@ -143,10 +153,12 @@ def segment():
         os.remove(file_path)
         return send_file(segmented_image_path, mimetype="image/jpeg")
     except Exception as e:
-        print(f"Error in /segment endpoint: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Log the detailed traceback for debugging
+        error_message = traceback.format_exc()
+        print(f"Error in /segment endpoint: {error_message}")
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
-# Detection Endpoint
+# Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
 def detect():
     try:
@@ -159,7 +171,9 @@ def detect():
 
         # Perform detection
         image = cv2.imread(file_path)
+        print(f"Detection Input Image Shape: {image.shape}")  # Log image shape
         image_tensor = torch.tensor(image).permute(2, 0, 1).unsqueeze(0).to(torch.float32) / 255.0
+        print(f"Detection Tensor Shape: {image_tensor.shape}")  # Log tensor shape
         result = detection_model(image_tensor)
 
         # Annotate image with bounding boxes
@@ -177,8 +191,9 @@ def detect():
         os.remove(file_path)
         return send_file(detected_image_path, mimetype="image/jpeg")
     except Exception as e:
-        print(f"Error in /detect endpoint: {e}")
-        return jsonify({"error": str(e)}), 500
-
+        # Log the detailed traceback for debugging
+        error_message = traceback.format_exc()
+        print(f"Error in /detect endpoint: {error_message}")
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
