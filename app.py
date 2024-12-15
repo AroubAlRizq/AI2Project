@@ -79,8 +79,8 @@ except Exception as e:
 # Helper function to preprocess images for classification
 def preprocess_image_for_classification(image_path):
     image = Image.open(image_path).convert("RGB")
-    image = image.resize((120, 120))  # Resize to match the model's expected input
-    image = np.array(image).reshape(-1) / 255.0  # Flatten the image
+    image = image.resize((128, 128))  # Resize to the model's expected input size
+    image = np.array(image) / 255.0  # Normalize pixel values
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
 
@@ -137,14 +137,16 @@ def segment():
 
         # Perform segmentation
         image = Image.open(file_path).convert("RGB")
-        image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0).float() / 255.0
+        image_tensor = torch.tensor(np.array(image).transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
         result = segmentation_model(image_tensor)
 
-        # Assuming the segmentation output contains a "masks" key
-        if "masks" not in result:
-            raise ValueError("Segmentation model did not return masks.")
+        # Check if the result contains the expected "masks" key
+        if isinstance(result, dict) and "masks" in result:
+            mask = result["masks"].squeeze().detach().cpu().numpy()
+        else:
+            raise ValueError("Segmentation model output does not contain 'masks'.")
 
-        mask = result["masks"][0].detach().cpu().numpy()
+        # Convert the mask to a binary image
         mask = (mask > 0.5).astype(np.uint8) * 255
         mask_image = Image.fromarray(mask).convert("L").resize(image.size)
         segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
@@ -155,9 +157,9 @@ def segment():
         os.remove(file_path)
         return send_file(segmented_image_path, mimetype="image/jpeg")
     except Exception as e:
-        error_message = traceback.format_exc()
-        print(f"Error in /segment endpoint: {error_message}")
+        print(f"Error in /segment endpoint: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 # Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
