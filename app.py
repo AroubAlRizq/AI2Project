@@ -135,9 +135,12 @@ def segment():
         file_path = "uploaded_image.jpg"
         file.save(file_path)
 
-        # Perform segmentation
+        # Preprocess the image for the segmentation model
         image = Image.open(file_path).convert("RGB")
-        image_tensor = torch.tensor(np.array(image).transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
+        image_np = np.array(image)  # Convert image to NumPy array
+        image_tensor = torch.tensor(image_np.transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
+
+        # Perform segmentation
         result = segmentation_model(image_tensor)
 
         # Check if the result contains the expected "masks" key
@@ -149,6 +152,8 @@ def segment():
         # Convert the mask to a binary image
         mask = (mask > 0.5).astype(np.uint8) * 255
         mask_image = Image.fromarray(mask).convert("L").resize(image.size)
+
+        # Overlay the mask onto the original image
         segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
 
         # Save and return the segmented image
@@ -159,7 +164,6 @@ def segment():
     except Exception as e:
         print(f"Error in /segment endpoint: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 # Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
