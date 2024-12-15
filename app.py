@@ -77,8 +77,8 @@ except Exception as e:
 # Helper function to preprocess images for classification
 def preprocess_image(image_path):
     image = Image.open(image_path).convert("RGB")
-    image = image.resize((224, 224))  # Resize to model input size
-    image = np.array(image) / 255.0  # Normalize pixel values
+    image = image.resize((240, 240))  # Resize to match the model's expected input
+    image = np.array(image).reshape(-1) / 255.0  # Flatten the image
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
 
