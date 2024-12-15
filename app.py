@@ -131,10 +131,10 @@ def segment():
         # Perform segmentation
         image = Image.open(file_path).convert("RGB")
         image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0)
-        result = segmentation_model(image_tensor)
+        result = segmentation_model(image_tensor)  # Run the model
 
-        # Generate a binary mask
-        mask = result[0].detach().cpu().numpy()
+        # Assuming the segmentation output is a dict, access the correct key
+        mask = result.get("masks", torch.zeros(image.size)).detach().cpu().numpy()
         mask = (mask > 0.5).astype(np.uint8) * 255
         mask_image = Image.fromarray(mask).convert("L").resize(image.size)
         segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
@@ -161,7 +161,7 @@ def detect():
 
         # Perform detection
         image = cv2.imread(file_path)
-        image_tensor = torch.unsqueeze(torch.tensor(image).permute(2, 0, 1), 0)
+        image_tensor = torch.tensor(image).permute(2, 0, 1).unsqueeze(0).to(torch.uint8)
         result = detection_model(image_tensor)
 
         # Annotate image with bounding boxes
