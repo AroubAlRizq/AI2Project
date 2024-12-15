@@ -143,27 +143,16 @@ def segment():
         # Perform segmentation
         result = segmentation_model(image_tensor)
 
-        # Check if the result contains the expected "masks" key
-        if isinstance(result, dict) and "masks" in result:
-            mask = result["masks"].squeeze().detach().cpu().numpy()
-        else:
-            raise ValueError("Segmentation model output does not contain 'masks'.")
+        # Print the result to the console/logs
+        print(f"Segmentation Model Output: {result}")
 
-        # Convert the mask to a binary image
-        mask = (mask > 0.5).astype(np.uint8) * 255
-        mask_image = Image.fromarray(mask).convert("L").resize(image.size)
-
-        # Overlay the mask onto the original image
-        segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
-
-        # Save and return the segmented image
-        segmented_image_path = "segmented_image.jpg"
-        segmented_image.save(segmented_image_path)
+        # Return the raw output as a JSON response (for debugging purposes)
         os.remove(file_path)
-        return send_file(segmented_image_path, mimetype="image/jpeg")
+        return jsonify({"segmentation_result": str(result)})
     except Exception as e:
         print(f"Error in /segment endpoint: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 # Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
