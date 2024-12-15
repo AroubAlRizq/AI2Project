@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from keras.models import load_model
 import torch
@@ -53,11 +53,26 @@ def download_models():
 download_models()
 
 # Load the models
-print("Loading models...")
-classification_model = load_model("models/CNN_No_Dropout.h5")
-segmentation_model = torch.load("models/best.pt", map_location=torch.device("cpu"))
-detection_model = torch.jit.load("models/best.torchscript", map_location=torch.device("cpu"))
-print("Models loaded successfully!")
+try:
+    print("Loading classification model...")
+    classification_model = load_model("models/CNN_No_Dropout.h5")
+    print("Classification model loaded successfully.")
+except Exception as e:
+    print(f"Failed to load classification model: {e}")
+
+try:
+    print("Loading segmentation model...")
+    segmentation_model = torch.load("models/best.pt", map_location=torch.device("cpu"))
+    print("Segmentation model loaded successfully.")
+except Exception as e:
+    print(f"Failed to load segmentation model: {e}")
+
+try:
+    print("Loading detection model...")
+    detection_model = torch.jit.load("models/best.torchscript", map_location=torch.device("cpu"))
+    print("Detection model loaded successfully.")
+except Exception as e:
+    print(f"Failed to load detection model: {e}")
 
 # Helper function to preprocess images for classification
 def preprocess_image(image_path):
@@ -67,6 +82,11 @@ def preprocess_image(image_path):
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"Error occurred: {e}")
+    return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
 @app.route("/")
 def home():
     return "Backend is running!"
@@ -74,87 +94,93 @@ def home():
 # Classification Endpoint
 @app.route("/classify", methods=["POST"])
 def classify():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files["file"]
-    file_path = "uploaded_image.jpg"
-    file.save(file_path)
+        file = request.files["file"]
+        file_path = "uploaded_image.jpg"
+        file.save(file_path)
 
-    # Preprocess and classify
-    image = preprocess_image(file_path)
-    prediction = classification_model.predict(image)
-    os.remove(file_path)  # Clean up the uploaded file
+        # Preprocess and classify
+        image = preprocess_image(file_path)
+        prediction = classification_model.predict(image)
+        os.remove(file_path)  # Clean up the uploaded file
 
-    # Determine the class label
-    predicted_class = "Class 1" if prediction[0][0] > 0.5 else "Class 0"
+        # Determine the class label
+        predicted_class = "Class 1" if prediction[0][0] > 0.5 else "Class 0"
+        class_name = CLASS_NAMES.get(predicted_class, "Unknown")
+        print(f"Classification Result: {class_name}")
 
-    # Map to the actual class name
-    class_name = CLASS_NAMES.get(predicted_class, "Unknown")
-
-    # Return the classification result
-    return jsonify({"classification_result": class_name})
+        return jsonify({"classification_result": class_name})
+    except Exception as e:
+        print(f"Error in /classify endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # Segmentation Endpoint
 @app.route("/segment", methods=["POST"])
 def segment():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files["file"]
-    file_path = "uploaded_image.jpg"
-    file.save(file_path)
+        file = request.files["file"]
+        file_path = "uploaded_image.jpg"
+        file.save(file_path)
 
-    # Perform segmentation
-    image = Image.open(file_path).convert("RGB")
-    image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0)  # Convert to tensor
-    result = segmentation_model(image_tensor)
+        # Perform segmentation
+        image = Image.open(file_path).convert("RGB")
+        image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0)
+        result = segmentation_model(image_tensor)
 
-    # Post-process and draw segmentation mask
-    mask = result[0].detach().cpu().numpy()  # Assuming the model outputs a mask
-    mask = (mask > 0.5).astype(np.uint8) * 255  # Binary mask
-    mask_image = Image.fromarray(mask).convert("L").resize(image.size)
-    segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
+        # Generate a binary mask
+        mask = result[0].detach().cpu().numpy()
+        mask = (mask > 0.5).astype(np.uint8) * 255
+        mask_image = Image.fromarray(mask).convert("L").resize(image.size)
+        segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
 
-    # Save the segmented image
-    segmented_image_path = "segmented_image.jpg"
-    segmented_image.save(segmented_image_path)
-    os.remove(file_path)  # Clean up the uploaded file
-
-    # Return the segmented image
-    return send_file(segmented_image_path, mimetype="image/jpeg")
+        # Save and return the segmented image
+        segmented_image_path = "segmented_image.jpg"
+        segmented_image.save(segmented_image_path)
+        os.remove(file_path)
+        return send_file(segmented_image_path, mimetype="image/jpeg")
+    except Exception as e:
+        print(f"Error in /segment endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # Detection Endpoint
 @app.route("/detect", methods=["POST"])
 def detect():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
 
-    file = request.files["file"]
-    file_path = "uploaded_image.jpg"
-    file.save(file_path)
+        file = request.files["file"]
+        file_path = "uploaded_image.jpg"
+        file.save(file_path)
 
-    # Perform object detection
-    image = cv2.imread(file_path)
-    image_tensor = torch.unsqueeze(torch.tensor(image).permute(2, 0, 1), 0)  # Convert to tensor
-    result = detection_model(image_tensor)
+        # Perform detection
+        image = cv2.imread(file_path)
+        image_tensor = torch.unsqueeze(torch.tensor(image).permute(2, 0, 1), 0)
+        result = detection_model(image_tensor)
 
-    # Post-process and draw bounding boxes
-    detection_output = result.tolist()
-    for detection in detection_output[0]:
-        confidence = detection[0]
-        x1, y1, x2, y2 = map(int, detection[1:5])
-        if confidence > 0.5:  # Only draw boxes with confidence > 0.5
-            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(image, f"{confidence:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        # Annotate image with bounding boxes
+        detection_output = result.tolist()
+        for detection in detection_output[0]:
+            confidence = detection[0]
+            x1, y1, x2, y2 = map(int, detection[1:5])
+            if confidence > 0.5:
+                cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(image, f"{confidence:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-    # Save the detected image
-    detected_image_path = "detected_image.jpg"
-    cv2.imwrite(detected_image_path, image)
-    os.remove(file_path)  # Clean up the uploaded file
-
-    # Return the detected image
-    return send_file(detected_image_path, mimetype="image/jpeg")
+        # Save and return the detected image
+        detected_image_path = "detected_image.jpg"
+        cv2.imwrite(detected_image_path, image)
+        os.remove(file_path)
+        return send_file(detected_image_path, mimetype="image/jpeg")
+    except Exception as e:
+        print(f"Error in /detect endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
