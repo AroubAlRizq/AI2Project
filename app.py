@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from keras.models import load_model
 import torch
-from PIL import Image, ImageDraw
+from PIL import Image
 import numpy as np
 import gdown
 import cv2
@@ -75,17 +75,12 @@ except Exception as e:
     print(f"Failed to load detection model: {e}")
 
 # Helper function to preprocess images for classification
-def preprocess_image(image_path):
+def preprocess_image_for_classification(image_path):
     image = Image.open(image_path).convert("RGB")
     image = image.resize((240, 240))  # Resize to match the model's expected input
-    image = np.array(image).reshape(-1) / 255.0  # Flatten the image
+    image = np.array(image) / 255.0  # Normalize
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
-
-@app.errorhandler(Exception)
-def handle_exception(e):
-    print(f"Error occurred: {e}")
-    return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 @app.route("/")
 def home():
@@ -103,7 +98,7 @@ def classify():
         file.save(file_path)
 
         # Preprocess and classify
-        image = preprocess_image(file_path)
+        image = preprocess_image_for_classification(file_path)
         prediction = classification_model.predict(image)
         os.remove(file_path)  # Clean up the uploaded file
 
@@ -130,13 +125,16 @@ def segment():
 
         # Perform segmentation
         image = Image.open(file_path).convert("RGB")
-        image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0)
+        image_tensor = torch.unsqueeze(torch.tensor(np.array(image)).permute(2, 0, 1), 0).float() / 255.0
         result = segmentation_model(image_tensor)  # Run the model
 
         # Assuming the segmentation output is a dict, access the correct key
-        mask = result.get("masks", torch.zeros(image.size)).detach().cpu().numpy()
-        mask = (mask > 0.5).astype(np.uint8) * 255
-        mask_image = Image.fromarray(mask).convert("L").resize(image.size)
+        if isinstance(result, dict) and "masks" in result:
+            mask = result["masks"][0].cpu().numpy()
+        else:
+            mask = torch.zeros((image.size[1], image.size[0])).numpy()
+
+        mask_image = Image.fromarray((mask * 255).astype(np.uint8)).resize(image.size)
         segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
 
         # Save and return the segmented image
@@ -161,17 +159,17 @@ def detect():
 
         # Perform detection
         image = cv2.imread(file_path)
-        image_tensor = torch.tensor(image).permute(2, 0, 1).unsqueeze(0).to(torch.uint8)
+        image_tensor = torch.tensor(image).permute(2, 0, 1).unsqueeze(0).to(torch.float32) / 255.0
         result = detection_model(image_tensor)
 
         # Annotate image with bounding boxes
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         detection_output = result.tolist()
         for detection in detection_output[0]:
             confidence = detection[0]
             x1, y1, x2, y2 = map(int, detection[1:5])
             if confidence > 0.5:
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(image, f"{confidence:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # Save and return the detected image
         detected_image_path = "detected_image.jpg"
