@@ -5,95 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cataract Eye Disease</title>
     <style>
-        /* Body Styling */
         body {
-            margin: 0;
             font-family: Arial, sans-serif;
-            background: linear-gradient(to bottom, #3c1053, #ad5389); /* Dark purple to light purple */
+            background: linear-gradient(to bottom, #3c1053, #ad5389);
             color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-
-        /* Page Title */
-        h1 {
-            margin-top: 20px;
-            font-size: 2.5rem;
-            color: #f8e1f4; /* Light purple */
-            text-shadow: 2px 2px 5px black;
-        }
-
-        /* Form Styling */
-        form {
-            background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
+            text-align: center;
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 500px;
-            width: 90%;
         }
-
-        label {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-            color: #f4c2d7; /* Soft pink-purple */
-        }
-
-        input[type="file"] {
-            margin-bottom: 15px;
-            padding: 5px;
-            border-radius: 5px;
-            background-color: #5b2c6f; /* Deep purple */
-            color: white;
-            border: none;
-        }
-
         button {
-            background-color: #7d3c98; /* Medium purple */
-            color: white;
-            font-size: 1rem;
+            margin: 10px;
             padding: 10px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        button:hover {
-            background-color: #a569bd; /* Light purple */
-            transform: scale(1.05);
-        }
-
-        /* Response Section */
-        h2 {
-            margin-top: 20px;
-            font-size: 1.8rem;
-            color: #f4c2d7; /* Soft pink-purple */
-        }
-
-        pre, img {
-            margin-top: 15px;
-            max-width: 500px;
-            width: 90%;
-            border-radius: 5px;
-        }
-
-        pre {
-            background-color: rgba(0, 0, 0, 0.6); /* Dark transparent background */
-            color: #f8e1f4; /* Light purple */
-            padding: 10px;
-            overflow-x: auto;
-        }
-
-        img {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
         }
     </style>
 </head>
@@ -108,12 +29,9 @@
     </form>
     <h2>Response:</h2>
     <div id="response"></div>
-
     <script>
-        // Backend URL (update this with your Render backend URL)
         const backendURL = "https://ai2project.onrender.com";
 
-        // Function to handle image uploads and process results
         function uploadImage(endpoint) {
             const formData = new FormData();
             const fileInput = document.getElementById("file");
@@ -122,42 +40,35 @@
                 return;
             }
             formData.append("file", fileInput.files[0]);
+            document.getElementById("response").innerHTML = "";
 
-            // Clear previous response
-            const responseDiv = document.getElementById("response");
-            responseDiv.innerHTML = "";
-
-            // Make the POST request to the backend
             fetch(backendURL + endpoint, {
                 method: "POST",
                 body: formData,
             })
-                .then((response) => {
-                    // Check if the response is an image or JSON
-                    const contentType = response.headers.get("content-type");
-                    if (contentType && contentType.includes("image")) {
-                        return response.blob(); // Image
+                .then(response => {
+                    if (response.ok) {
+                        if (response.headers.get("content-type").includes("image")) {
+                            return response.blob();
+                        } else {
+                            return response.json();
+                        }
                     } else {
-                        return response.json(); // JSON
+                        throw new Error(`Server error: ${response.status}`);
                     }
                 })
-                .then((data) => {
-                    // Handle JSON response
+                .then(data => {
+                    const responseDiv = document.getElementById("response");
                     if (data instanceof Blob) {
-                        // Display the image
                         const img = document.createElement("img");
                         img.src = URL.createObjectURL(data);
                         responseDiv.appendChild(img);
                     } else {
-                        // Display the JSON response
-                        const pre = document.createElement("pre");
-                        pre.textContent = JSON.stringify(data, null, 2);
-                        responseDiv.appendChild(pre);
+                        responseDiv.textContent = JSON.stringify(data, null, 2);
                     }
                 })
-                .catch((error) => {
-                    console.error("Error:", error);
-                    responseDiv.textContent = "An error occurred!";
+                .catch(error => {
+                    document.getElementById("response").textContent = "Error: " + error.message;
                 });
         }
     </script>
