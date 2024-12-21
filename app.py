@@ -135,23 +135,36 @@ def segment():
         file_path = "uploaded_image.jpg"
         file.save(file_path)
 
-        # Preprocess the image for the segmentation model
+        # Perform segmentation
         image = Image.open(file_path).convert("RGB")
         image_np = np.array(image)  # Convert image to NumPy array
         image_tensor = torch.tensor(image_np.transpose(2, 0, 1)).unsqueeze(0).float() / 255.0
 
-        # Perform segmentation
+        # Get the model's output
         result = segmentation_model(image_tensor)
 
-        # Print the result to the console/logs
+        # Debugging: Print the structure of the result
         print(f"Segmentation Model Output: {result}")
 
-        # Return the raw output as a JSON response (for debugging purposes)
-        os.remove(file_path)
-        return jsonify({"segmentation_result": str(result)})
+        # Assuming the segmentation output has a "masks" key
+        if isinstance(result, dict) and "masks" in result:
+            mask = result["masks"].detach().cpu().numpy()
+            mask = (mask > 0.5).astype(np.uint8) * 255
+            mask_image = Image.fromarray(mask).convert("L").resize(image.size)
+            segmented_image = Image.composite(image, Image.new("RGB", image.size, (255, 0, 0)), mask_image)
+
+            # Save and return the segmented image
+            segmented_image_path = "segmented_image.jpg"
+            segmented_image.save(segmented_image_path)
+            os.remove(file_path)
+            return send_file(segmented_image_path, mimetype="image/jpeg")
+        else:
+            raise ValueError("Segmentation model output is not in the expected format.")
+
     except Exception as e:
         print(f"Error in /segment endpoint: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 # Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
