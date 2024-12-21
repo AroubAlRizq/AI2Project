@@ -153,7 +153,6 @@ def segment():
         print(f"Error in /segment endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
-
 # Update detect endpoint with better error logging
 @app.route("/detect", methods=["POST"])
 def detect():
